@@ -1,0 +1,74 @@
+Create a Python script named Messier_Objects.py that calculates the visibility of Messier objects during the night between the end of evening astronomical twilight and the start of morning astronomical twilight for a specified location. The script should meet the following requirements:
+
+Configuration:
+Load location details (latitude, longitude, altitude, timezone) from a .env file in the current directory.
+Expected .env variables: LATITUDE (decimal degrees), LONGITUDE (decimal degrees, West negative), ALTITUDE (meters), TIMEZONE (IANA name, e.g., 'America/Chicago').
+Validate inputs and exit with an error if invalid (latitude -90 to 90, longitude -180 to 180) or missing.
+Handle inline comments (after #) and whitespace in .env values.
+
+Astronomical Calculations:
+Use astroplan, astropy, and numpy libraries.
+Calculate the upcoming evening astronomical twilight end (t_evening_astro_twil_end) and morning astronomical twilight start (t_morning_astro_twil_start) using astroplan.Observer.
+Compute Local Sidereal Time (LST) at these twilight times and at the Sun’s anti-meridian (midpoint of the night) for output purposes only, not for filtering.
+Include objects that are above 30 degrees altitude at least at one of:
+Evening twilight (t_evening_astro_twil_end).
+Transit time, if it occurs within the observation window (between twilight times).
+Morning twilight (t_morning_astro_twil_start).
+Do not filter objects based on their RA relative to the LST range.
+
+Object Visibility:
+Process Messier objects M1 to M110 using astroplan.FixedTarget.from_name.
+For each object:
+Calculate transit time using target_meridian_transit_time with which="nearest" relative to the Sun’s anti-meridian time.
+Calculate rise time (altitude crossing 30°) using target_rise_time with which="previous" relative to the transit time.
+Calculate set time using target_set_time with which="next" relative to the transit time.
+Compute maximum altitude at transit using observer.altaz.
+Flag objects as circumpolar if their declination > (90 - latitude) degrees; for these, set rise/set times to None (display as "Circumpolar").
+Include an object if its altitude exceeds 30° at any of the three key times (evening twilight, transit within window, morning twilight).
+
+Output Formatting:
+Mark rise times before evening twilight and set times after morning twilight with an asterisk (*) in the output.
+Format RA as 'HH MM SS.S' (hourangle, space-separated, 1 decimal second).
+Format Dec as '+DD MM SS' (degrees, space-separated, whole seconds, always show sign).
+Format times as 'HH:MM:SS TZ' (timezone from .env), omitting the date, or "N/A" if invalid, or "Circumpolar" for circumpolar objects.
+Sort objects by RA in the output.
+Display a table with columns: Object, RA (J2000), Dec (J2000), Rise > 30°, Transit, Max Alt, Set < 30°.
+Write results to a timestamped file (Messier_Objects_YYYYMMDD_HHMMSS.txt) with a header including:
+Location (latitude, longitude, altitude).
+Timezone.
+Observation window (full date/time).
+LST range (for reference).
+Sun’s anti-meridian time and LST.
+Total number of objects.
+Altitude threshold (>30°).
+Notes explaining the inclusion criteria, asterisk meaning, circumpolar definition, and that times use direct astroplan calculations.
+
+Error Handling:
+Exit with an error if required libraries (python-dotenv, astropy, numpy, astroplan) are missing, with instructions to install (e.g., pip install astropy).
+Handle invalid .env files, missing variables, or invalid values gracefully.
+Catch exceptions for individual object calculations (e.g., name lookup failures for M102) and print a warning, continuing to the next object.
+Handle masked or invalid times (e.g., np.ma.core.MaskedConstant) by displaying "N/A".
+Suppress common AstropyWarning messages to reduce noise.
+
+Additional Requirements:
+Use astropy.units for all angle and altitude calculations.
+Ensure the script is robust for various latitudes (e.g., polar regions where twilight may behave differently).
+Print progress messages (e.g., "Checking 110 Messier objects...", "Found X objects meeting the criteria").
+Exit cleanly if twilight calculations fail (e.g., in polar regions).
+
+Output Example:
+For a location like Lat=31.5473, Lon=-99.3827, Alt=446m, Timezone=America/Chicago:
+text
+
+Object   RA (J2000)   Dec (J2000)  Rise > 30°      Transit         Max Alt  Set < 30°      
+===========================================================================================
+M38      05 28 40.1   +35 49 26    12:32:31 CDT*   17:26:32 CDT    85.7°    22:20:43 CDT   
+M1       05 34 31.8   +22 01 03    13:03:28 CDT*   17:32:18 CDT    80.5°    22:01:07 CDT   
+...
+M68      12 39 28.0   -26 44 39    23:39:01 CDT    00:35:55 CDT    31.6°    01:32:49 CDT   
+...
+M81      09 55 33.2   +69 03 55    Circumpolar     21:53:11 CDT    52.6°    Circumpolar    
+...
+M13      16 41 41.6   +36 27 41    23:42:00 CDT    04:37:07 CDT    85.1°    09:32:06 CDT*  
+
+Please generate the complete script, ensuring it meets all requirements, is well-documented with comments, and produces output matching the specified format. Save results to a timestamped file and handle all edge cases robustly.

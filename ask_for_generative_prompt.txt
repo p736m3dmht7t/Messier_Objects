@@ -1,0 +1,3 @@
+Please create a prompt that I could have given you so that you would have generated this final version of the code in 
+one shot on the first try incorporating all requirements and lessons learned from our iterations:.  I will save this 
+prompt with my project file for future use.

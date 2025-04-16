@@ -1,0 +1,16 @@
+Package           Version
+----------------- -------------------
+astroplan         0.10.1
+astropy           6.1.7
+astropy-iers-data 0.2025.4.14.0.37.22
+DateTime          5.5
+numpy             2.2.4
+packaging         24.2
+pip               25.0.1
+pyerfa            2.0.1.5
+python-dotenv     1.1.0
+pytz              2025.2
+PyYAML            6.0.2
+setuptools        78.1.0
+six               1.17.0
+zope.interface    7.2
