@@ -127,7 +127,7 @@ M13      16 41 41.6   +36 27 41    23:42:00 CDT    04:37:07 CDT    85.1°    09:
 ## Credits
 
 - **Developer**: Grok 3, created by xAI, designed and implemented the script with robust astronomical calculations and user-friendly output.
-- **Concept**: [Your Name], who proposed the need for a tool to identify visible Messier objects, guiding the script’s requirements.
+- **Concept**: John Phillips, john.d.phillips@comcast.net, who proposed the need for a tool to identify visible Messier objects, guiding the script’s requirements.
 
 ## Notes for Future Use
 
