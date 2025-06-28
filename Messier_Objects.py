@@ -160,6 +160,8 @@ def main():
 
     # 3. Calculate Twilight and LST (for output only)
     now = Time.now()
+#    now = Time("2025-06-26 01:00:00")
+    
     print(f"Current time: {now.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
     try:
