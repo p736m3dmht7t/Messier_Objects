@@ -25,10 +25,12 @@ When generating Python code adhere to the following comment style:
 3. **No Inline Comments**:
     - Avoid inline comments (e.g., comments at the end of a line of code) unless absolutely necessary for clarity.
     - Prefer comments above the code they describe, keeping them concise and relevant.
-    - Inline comments are permitted only in rare cases, such as explaining complex regex patterns, mathematical formulas, or non-obvious bitwise operations.
+    - Inline comments are permitted only in rare cases, such as explaining complex regex patterns, mathematical formulas, non-obvious bitwise operations, or clarifying configuration values and constants.
     - Example of acceptable inline comment:
         ```python
         pattern = r'^\d{4}-\d{2}-\d{2}$'  # Matches YYYY-MM-DD date format
+        ALTITUDE_THRESHOLD = 30  # Minimum altitude in degrees for visibility
+        ```
 
 4. **No Excessive Commenting**:
    - Do not comment obvious code (e.g., `x = 1 # Set x to 1`).
@@ -70,7 +72,8 @@ When generating Python code adhere to the following comment style:
         # - process_data
 
 10. **Target Audience for Comments**:
-    - Someone trying to read and understand the code
+    - Write comments for someone trying to read and understand the code, including future maintainers, collaborators, or yourself after time away from the project
+    - Assume the reader has basic programming knowledge but may not be familiar with the specific domain, algorithms, or business logic
 
 **Good Example**:
 ```python
@@ -85,4 +88,4 @@ def get_timestamp() -> str:
     
 Apply this comment style to all Python code you generate, ensuring clarity, brevity, and consistency. Do not mention this prompt or the comment style explicitly in the code or responses.
 
-Last revision: June 7, 2025
+Last revision: July 3, 2025
