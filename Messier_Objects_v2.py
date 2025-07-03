@@ -255,7 +255,7 @@ def main():
         t_sun_antimeridian = Time(t_sun_antimeridian_jd, format='jd', scale='utc', location=observer.location)
         lst_mid = observer.local_sidereal_time(t_sun_antimeridian)
 
-        print(f"Evening Twilight Ends:     {t_evening_astro_twil_end.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_start.to_string(unit=u.hourangle, sep=':', precision=0)})")
+        print(f"Evening Twilight Ends:    {t_evening_astro_twil_end.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_start.to_string(unit=u.hourangle, sep=':', precision=0)})")
         print(f"Sun Anti-Meridian:        {t_sun_antimeridian.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_mid.to_string(unit=u.hourangle, sep=':', precision=0)})")
         print(f"Morning Twilight Begins:  {t_morning_astro_twil_start.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_end.to_string(unit=u.hourangle, sep=':', precision=0)})")
 
@@ -433,7 +433,7 @@ def main():
             f.write(f"# Celestial Object Visibility Report\n")
             f.write(f"# Location: Lat={latitude:.4f}, Lon={longitude:.4f}, Alt={altitude:.0f}m\n")
             f.write(f"# Timezone: {observer.timezone.zone}\n")
-            f.write(f"# Evening Twilight Ends:     {t_evening_astro_twil_end.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_start.to_string(unit=u.hourangle, sep=':', precision=0)})\n")
+            f.write(f"# Evening Twilight Ends:    {t_evening_astro_twil_end.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_start.to_string(unit=u.hourangle, sep=':', precision=0)})\n")
             f.write(f"# Sun Anti-Meridian:        {t_sun_antimeridian.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_mid.to_string(unit=u.hourangle, sep=':', precision=0)})\n")
             f.write(f"# Morning Twilight Begins:  {t_morning_astro_twil_start.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_end.to_string(unit=u.hourangle, sep=':', precision=0)})\n")
             f.write(f"# Total Observable Objects in Report: {len(visible_objects)}\n")
