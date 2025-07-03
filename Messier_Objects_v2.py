@@ -4,7 +4,7 @@
 # during the night between evening and morning astronomical twilight.
 # Includes objects that are above 30 degrees altitude at evening twilight,
 # observable transit, or morning twilight, regardless of their Right Ascension.
-# User-defined objects are specified in the .env file via the ADDITIONAL_OBJECTS variable.
+# User-defined objects are specified in the custom_objects.json file.
 #
 # Uses astroplan's direct rise/set/transit methods. An object is circumpolar if
 # its declination > (90 - latitude) degrees. Rise/set times outside the observation
@@ -52,17 +52,18 @@ except ImportError:
 # See docstring for .env variable details.
 def load_configuration():
     """
-    Loads location configuration and custom astronomical objects from the .env file.
+    Loads location configuration from the .env file and custom astronomical objects from custom_objects.json.
 
     Expected variables in .env:
     - LATITUDE: Latitude in decimal degrees.
     - LONGITUDE: Longitude in decimal degrees (West is negative).
     - ALTITUDE: Altitude in meters above sea level.
     - TIMEZONE: IANA Time Zone Name (e.g., 'America/Chicago').
-    - ADDITIONAL_OBJECTS (optional): JSON string representing a list of custom objects.
-      Each object in the list must be a dictionary with 'name', 'ra', and 'dec' keys.
-      RA and Dec should be strings parsable by astropy's SkyCoord (e.g., "HHhMMmSS.Ss", "DDdMMmSSs").
-      Example: ADDITIONAL_OBJECTS=[{"name": "My Star", "ra": "10h30m00s", "dec": "+45d00m00s"}]
+    
+    Expected format of custom_objects.json (optional):
+    JSON array of objects, each with 'name', 'ra', and 'dec' keys.
+    RA and Dec should be strings parsable by astropy's SkyCoord (e.g., "HHhMMmSS.Ss", "DDdMMmSSs").
+    Example: [{"name": "My Star", "ra": "10h30m00s", "dec": "+45d00m00s"}]
 
     Returns:
         tuple: (latitude, longitude, altitude, timezone_str, additional_objects_data)
@@ -80,8 +81,6 @@ def load_configuration():
     lon_str = os.getenv('LONGITUDE')
     alt_str = os.getenv('ALTITUDE')
     timezone_str = os.getenv('TIMEZONE')
-    additional_objects_str = os.getenv('ADDITIONAL_OBJECTS')
-
     if not all([lat_str, lon_str, alt_str, timezone_str]):
         print("Error: Missing required variables (LATITUDE, LONGITUDE, ALTITUDE, TIMEZONE) in .env file.")
         return None, None, None, None, []
@@ -108,33 +107,33 @@ def load_configuration():
         print(f"Unexpected error during core configuration loading: {e}")
         return None, None, None, None, []
 
-    # Process additional objects
+    # Load custom objects from JSON file
     additional_objects_data = []
-    if additional_objects_str:
-        cleaned_additional_objects_str = additional_objects_str.split('#', 1)[0].strip()
-        if cleaned_additional_objects_str: # Check if string is not empty after stripping comments
-            try:
-                parsed_objects = json.loads(cleaned_additional_objects_str)
+    custom_objects_file = 'custom_objects.json'
+    if os.path.exists(custom_objects_file):
+        try:
+            with open(custom_objects_file, 'r') as f:
+                parsed_objects = json.load(f)
                 if not isinstance(parsed_objects, list):
-                    print("Error: ADDITIONAL_OBJECTS in .env must be a JSON list. Custom objects will not be loaded.")
+                    print("Error: custom_objects.json must contain a JSON list. Custom objects will not be loaded.")
                 else:
                     for i, obj_data in enumerate(parsed_objects):
                         if not isinstance(obj_data, dict):
-                            print(f"Warning: Item {i} in ADDITIONAL_OBJECTS is not a dictionary. Skipping.")
+                            print(f"Warning: Item {i} in custom_objects.json is not a dictionary. Skipping.")
                             continue
                         if not all(key in obj_data for key in ['name', 'ra', 'dec']):
-                            print(f"Warning: Item {i} ('{obj_data.get('name', 'N/A')}') in ADDITIONAL_OBJECTS is missing 'name', 'ra', or 'dec'. Skipping.")
+                            print(f"Warning: Item {i} ('{obj_data.get('name', 'N/A')}') in custom_objects.json is missing 'name', 'ra', or 'dec'. Skipping.")
                             continue
                         # Basic validation passed, will be fully validated during FixedTarget creation
                         additional_objects_data.append(obj_data)
                     if additional_objects_data:
-                        print(f"Loaded {len(additional_objects_data)} custom object(s) definitions from .env.")
-            except json.JSONDecodeError as e:
-                print(f"Error: Could not parse ADDITIONAL_OBJECTS JSON: {e}. Custom objects will not be loaded.")
-            except Exception as e:
-                print(f"Unexpected error loading ADDITIONAL_OBJECTS: {e}. Custom objects will not be loaded.")
-        else:
-            print("Info: ADDITIONAL_OBJECTS variable found in .env but is empty or fully commented out.")
+                        print(f"Loaded {len(additional_objects_data)} custom object(s) definitions from custom_objects.json.")
+        except json.JSONDecodeError as e:
+            print(f"Error: Could not parse custom_objects.json: {e}. Custom objects will not be loaded.")
+        except Exception as e:
+            print(f"Unexpected error loading custom_objects.json: {e}. Custom objects will not be loaded.")
+    else:
+        print("Info: custom_objects.json file not found. No custom objects will be loaded.")
 
     return latitude, longitude, altitude, timezone_str, additional_objects_data
 
@@ -215,12 +214,30 @@ def main():
         print("Ensure LATITUDE, LONGITUDE, ALTITUDE are valid and TIMEZONE is a valid IANA name.")
         sys.exit(1)
 
-    # 3. Calculate Twilight and LST (for output only)
-    now = Time.now()
-    # Fixed time for consistent testing/demonstration; remove or comment out for live runs
-    now = Time("2025-06-26 01:00:00")
+    # 3. Get observation date from user
+    print("\nDate Selection:")
+    print("1. Tonight (default)")
+    print("2. Specific date")
     
-    print(f"Reference time for 'tonight': {now.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}")
+    choice = input("Enter choice (1 or 2, press Enter for tonight): ").strip()
+    
+    if choice == "2":
+        while True:
+            date_input = input("Enter date (YYYY-MM-DD) or datetime (YYYY-MM-DD HH:MM:SS): ").strip()
+            try:
+                # Try to parse as datetime first, then as date
+                if len(date_input) > 10:  # Likely includes time
+                    now = Time(date_input)
+                else:  # Just date, use noon as reference
+                    now = Time(f"{date_input} 12:00:00")
+                break
+            except Exception as e:
+                print(f"Invalid date format. Please use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS")
+                continue
+    else:
+        now = Time.now()
+    
+    print(f"Reference time for observation: {now.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
     try:
         t_evening_astro_twil_end = observer.twilight_evening_astronomical(now, which='next')
@@ -234,12 +251,7 @@ def main():
         lst_end = observer.local_sidereal_time(t_morning_astro_twil_start)
 
         # Calculate time of Sun's anti-meridian passage (approximate local midnight)
-        # Ensure that twilight times are valid before attempting to use their JD values
-        if np.isnan(t_evening_astro_twil_end.jd) or np.isnan(t_morning_astro_twil_start.jd):
-             raise ValueError("Invalid Julian dates for twilight times.")
         t_sun_antimeridian_jd = (t_evening_astro_twil_end.jd + t_morning_astro_twil_start.jd) / 2.0
-        if np.isnan(t_sun_antimeridian_jd): # Should not happen if inputs are not NaN
-            raise ValueError("Invalid Julian date for Sun's anti-meridian crossing.")
         t_sun_antimeridian = Time(t_sun_antimeridian_jd, format='jd', scale='utc', location=observer.location)
         lst_mid = observer.local_sidereal_time(t_sun_antimeridian)
 
@@ -271,9 +283,9 @@ def main():
             # This can happen if object name resolution fails (e.g. network issue, or bad name)
             print(f"Warning: Could not resolve Messier object {m_name}: {e}. Skipping.")
 
-    # Add custom objects from .env
+    # Add custom objects from custom_objects.json
     if additional_objects_data:
-        print(f"Preparing {len(additional_objects_data)} custom object(s) from .env...")
+        print(f"Preparing {len(additional_objects_data)} custom object(s) from custom_objects.json...")
         for custom_obj_info in additional_objects_data:
             name = custom_obj_info['name']
             ra_str = custom_obj_info['ra']
@@ -355,9 +367,9 @@ def main():
             
             max_alt_at_transit = 0 * u.deg
             if transit_time is not None and not isinstance(transit_time, np.ma.core.MaskedConstant):
-                 max_alt_at_transit = observer.altaz(transit_time, target).alt
+                max_alt_at_transit = observer.altaz(transit_time, target).alt
             else: # Should not happen if target_meridian_transit_time is robust
-                 max_alt_at_transit = observer.target_upper_transit_altitude(target)
+                max_alt_at_transit = observer.target_upper_transit_altitude(target)
 
 
             visible_objects.append({
@@ -427,7 +439,7 @@ def main():
             f.write(f"# Total Observable Objects in Report: {len(visible_objects)}\n")
             f.write(f"# Altitude Threshold: > {altitude_limit}\n")
             f.write("# Objects included if: above 30° at evening twilight, OR transit is observable and above 30°, OR above 30° at morning twilight.\n")
-            f.write("# Includes standard Messier objects and any custom objects defined in .env (ADDITIONAL_OBJECTS).\n")
+            f.write("# Includes standard Messier objects and any custom objects defined in custom_objects.json.\n")
             f.write("# Times are based on direct astroplan calculations for the specified horizon.\n")
             f.write("# Times marked with '*' occur before evening twilight (rise) or after morning twilight (set).\n")
             f.write(f"# 'Circumpolar' indicates object remains above {altitude_limit.value}° for the entire night period.\n")
