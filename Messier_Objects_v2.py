@@ -59,6 +59,7 @@ def load_configuration():
     - LONGITUDE: Longitude in decimal degrees (West is negative).
     - ALTITUDE: Altitude in meters above sea level.
     - TIMEZONE: IANA Time Zone Name (e.g., 'America/Chicago').
+    - ALTITUDE_LIMIT: Minimum altitude in degrees for visibility (optional, defaults to 30).
     
     Expected format of custom_objects.json (optional):
     JSON array of objects, each with 'name', 'ra', and 'dec' keys.
@@ -66,13 +67,14 @@ def load_configuration():
     Example: [{"name": "My Star", "ra": "10h30m00s", "dec": "+45d00m00s"}]
 
     Returns:
-        tuple: (latitude, longitude, altitude, timezone_str, additional_objects_data)
+        tuple: (latitude, longitude, altitude, timezone_str, altitude_limit, additional_objects_data)
                - latitude (float|None): Latitude in degrees.
                - longitude (float|None): Longitude in degrees.
                - altitude (float|None): Altitude in meters.
                - timezone_str (str|None): IANA timezone string.
+               - altitude_limit (float|None): Altitude limit in degrees.
                - additional_objects_data (list): List of dicts for custom objects, empty if none or error.
-               Returns (None, None, None, None, []) if core configuration is invalid.
+               Returns (None, None, None, None, None, []) if core configuration is invalid.
     """
     if not load_dotenv(override=True):
         print("Warning: .env file not found in the current directory.")
@@ -81,31 +83,42 @@ def load_configuration():
     lon_str = os.getenv('LONGITUDE')
     alt_str = os.getenv('ALTITUDE')
     timezone_str = os.getenv('TIMEZONE')
+    altitude_limit_str = os.getenv('ALTITUDE_LIMIT')
     if not all([lat_str, lon_str, alt_str, timezone_str]):
         print("Error: Missing required variables (LATITUDE, LONGITUDE, ALTITUDE, TIMEZONE) in .env file.")
-        return None, None, None, None, []
+        return None, None, None, None, None, []
 
-    latitude, longitude, altitude = None, None, None
+    latitude, longitude, altitude, altitude_limit = None, None, None, None
     try:
         latitude = float(lat_str.split('#', 1)[0].strip())
         longitude = float(lon_str.split('#', 1)[0].strip())
         altitude = float(alt_str.split('#', 1)[0].strip())
         timezone_str = timezone_str.split('#', 1)[0].strip()
 
+        # Parse ALTITUDE_LIMIT with default fallback
+        if altitude_limit_str:
+            altitude_limit = float(altitude_limit_str.split('#', 1)[0].strip())
+        else:
+            altitude_limit = 30.0  # Default value
+            print("Warning: ALTITUDE_LIMIT not found in .env file. Using default value of 30 degrees.")
+
         if not (-90 <= latitude <= 90):
             print(f"Error: Invalid LATITUDE: {latitude}. Must be between -90 and 90.")
-            return None, None, None, None, []
+            return None, None, None, None, None, []
         if not (-180 <= longitude <= 180):
             print(f"Error: Invalid LONGITUDE: {longitude}. Must be between -180 and 180.")
-            return None, None, None, None, []
+            return None, None, None, None, None, []
+        if not (0 <= altitude_limit <= 90):
+            print(f"Error: Invalid ALTITUDE_LIMIT: {altitude_limit}. Must be between 0 and 90.")
+            return None, None, None, None, None, []
 
-        print(f"Configuration loaded: Lat={latitude}, Lon={longitude}, Alt={altitude}m, TZ={timezone_str}")
+        print(f"Configuration loaded: Lat={latitude}, Lon={longitude}, Alt={altitude}m, TZ={timezone_str}, Altitude Limit={altitude_limit}°")
     except ValueError as e:
         print(f"Error: Could not convert core configuration values to numbers: {e}")
-        return None, None, None, None, []
+        return None, None, None, None, None, []
     except Exception as e:
         print(f"Unexpected error during core configuration loading: {e}")
-        return None, None, None, None, []
+        return None, None, None, None, None, []
 
     # Load custom objects from JSON file
     additional_objects_data = []
@@ -135,7 +148,7 @@ def load_configuration():
     else:
         print("Info: custom_objects.json file not found. No custom objects will be loaded.")
 
-    return latitude, longitude, altitude, timezone_str, additional_objects_data
+    return latitude, longitude, altitude, timezone_str, altitude_limit, additional_objects_data
 
 # --- Formatting Helpers ---
 # Utility functions for formatting astronomical coordinates and time for display.
@@ -151,6 +164,33 @@ def format_ra(ra_angle):
 def format_dec(dec_angle):
     """Formats an Astropy Angle (Dec) to '+DD MM SS' string."""
     return dec_angle.to_string(unit=u.degree, sep=' ', precision=0, pad=True, alwayssign=True)
+
+# --- calculate_horizon_ra ---
+# Calculates the Right Ascension of objects at the altitude limit for specific azimuths
+# Uses the defined altitude_limit (30°) instead of true horizon (0°)
+def calculate_horizon_ra(observer, time, azimuth, altitude):
+    """
+    Calculate the RA of an object at the specified altitude at a specific azimuth.
+    
+    Args:
+        observer (astroplan.Observer): Observer with location and timezone info.
+        time (astropy.time.Time): Time for the calculation.
+        azimuth (float): Azimuth in degrees (90° = East, 270° = West).
+        altitude (astropy.units.Quantity): Altitude (e.g., 30°).
+    
+    Returns:
+        astropy.coordinates.Angle: Right Ascension at the specified altitude.
+    """
+    from astropy.coordinates import AltAz, ICRS
+    
+    # Create horizontal coordinate at specified altitude
+    horizon_coord = AltAz(alt=altitude, az=azimuth*u.deg, 
+                         obstime=time, location=observer.location)
+    
+    # Convert to equatorial coordinates (RA/Dec)
+    equatorial_coord = horizon_coord.transform_to(ICRS())
+    
+    return equatorial_coord.ra
 
 # --- format_time_only ---
 # Formats an Astropy Time to 'HH:MM:SS TZ', omitting the date, with optional markers.
@@ -195,7 +235,7 @@ def main():
     print("Starting Celestial Object Visibility Calculation...")
 
     # 1. Load Configuration
-    latitude, longitude, altitude, timezone_str, additional_objects_data = load_configuration()
+    latitude, longitude, altitude, timezone_str, altitude_limit, additional_objects_data = load_configuration()
     if latitude is None: # Core configuration failed
         print("Exiting due to configuration errors.")
         sys.exit(1)
@@ -266,8 +306,21 @@ def main():
         print(f"Unexpected error during twilight calculation: {e}")
         sys.exit(1)
 
-    altitude_limit = 30 * u.deg
+    altitude_limit = altitude_limit * u.deg
     print(f"Altitude threshold: Objects must reach at least {altitude_limit}")
+
+    # Calculate horizon RAs at altitude limit for key times
+    ra_east_evening = calculate_horizon_ra(observer, t_evening_astro_twil_end, 90, altitude_limit)
+    ra_west_evening = calculate_horizon_ra(observer, t_evening_astro_twil_end, 270, altitude_limit)
+    ra_east_midnight = calculate_horizon_ra(observer, t_sun_antimeridian, 90, altitude_limit)
+    ra_west_midnight = calculate_horizon_ra(observer, t_sun_antimeridian, 270, altitude_limit)
+    ra_east_morning = calculate_horizon_ra(observer, t_morning_astro_twil_start, 90, altitude_limit)
+    ra_west_morning = calculate_horizon_ra(observer, t_morning_astro_twil_start, 270, altitude_limit)
+
+    print(f"Horizon RAs at {altitude_limit} altitude:")
+    print(f"  Evening: East RA {format_ra(ra_east_evening)}, West RA {format_ra(ra_west_evening)}")
+    print(f"  Midnight: East RA {format_ra(ra_east_midnight)}, West RA {format_ra(ra_west_midnight)}")
+    print(f"  Morning: East RA {format_ra(ra_east_morning)}, West RA {format_ra(ra_west_morning)}")
 
     # 4. Prepare list of targets (Messier + Custom)
     all_targets_to_process = []
@@ -433,9 +486,9 @@ def main():
             f.write(f"# Celestial Object Visibility Report\n")
             f.write(f"# Location: Lat={latitude:.4f}, Lon={longitude:.4f}, Alt={altitude:.0f}m\n")
             f.write(f"# Timezone: {observer.timezone.zone}\n")
-            f.write(f"# Evening Twilight Ends:    {t_evening_astro_twil_end.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_start.to_string(unit=u.hourangle, sep=':', precision=0)})\n")
-            f.write(f"# Sun Anti-Meridian:        {t_sun_antimeridian.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_mid.to_string(unit=u.hourangle, sep=':', precision=0)})\n")
-            f.write(f"# Morning Twilight Begins:  {t_morning_astro_twil_start.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_end.to_string(unit=u.hourangle, sep=':', precision=0)})\n")
+            f.write(f"# Evening Twilight Ends:    {t_evening_astro_twil_end.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_start.to_string(unit=u.hourangle, sep=':', precision=0)})  East RA: {format_ra(ra_east_evening)}  West RA: {format_ra(ra_west_evening)}\n")
+            f.write(f"# Sun Anti-Meridian:        {t_sun_antimeridian.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_mid.to_string(unit=u.hourangle, sep=':', precision=0)})  East RA: {format_ra(ra_east_midnight)}  West RA: {format_ra(ra_west_midnight)}\n")
+            f.write(f"# Morning Twilight Begins:  {t_morning_astro_twil_start.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_end.to_string(unit=u.hourangle, sep=':', precision=0)})  East RA: {format_ra(ra_east_morning)}  West RA: {format_ra(ra_west_morning)}\n")
             f.write(f"# Total Observable Objects in Report: {len(visible_objects)}\n")
             f.write(f"# Altitude Threshold: > {altitude_limit}\n")
             f.write("# Objects included if: above 30° at evening twilight, OR transit is observable and above 30°, OR above 30° at morning twilight.\n")
