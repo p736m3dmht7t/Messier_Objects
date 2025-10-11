@@ -280,12 +280,12 @@ def main():
     print(f"Reference time for observation: {now.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
     try:
-        t_evening_astro_twil_end = observer.twilight_evening_astronomical(now, which='next')
+        t_evening_astro_twil_end = observer.twilight_evening_astronomical(now, which='next', n_grid_points=360)
         if t_evening_astro_twil_end is None or isinstance(t_evening_astro_twil_end, np.ma.core.MaskedConstant):
             raise ValueError("Could not calculate evening astronomical twilight.")
         lst_start = observer.local_sidereal_time(t_evening_astro_twil_end)
 
-        t_morning_astro_twil_start = observer.twilight_morning_astronomical(t_evening_astro_twil_end, which='next')
+        t_morning_astro_twil_start = observer.twilight_morning_astronomical(t_evening_astro_twil_end, which='next', n_grid_points=360)
         if t_morning_astro_twil_start is None or isinstance(t_morning_astro_twil_start, np.ma.core.MaskedConstant):
             raise ValueError("Could not calculate morning astronomical twilight.")
         lst_end = observer.local_sidereal_time(t_morning_astro_twil_start)
@@ -369,13 +369,13 @@ def main():
             dec = target.coord.dec
 
             transit_time = observer.target_meridian_transit_time(
-                t_sun_antimeridian, target, which="nearest"
+                t_sun_antimeridian, target, which="nearest", n_grid_points=360
             )
             rise_time = observer.target_rise_time(
-                transit_time, target, which="previous", horizon=altitude_limit
+                transit_time, target, which="previous", horizon=altitude_limit, n_grid_points=360
             )
             set_time = observer.target_set_time(
-                transit_time, target, which="next", horizon=altitude_limit
+                transit_time, target, which="next", horizon=altitude_limit, n_grid_points=360
             )
 
             altitudes_at_key_times = []
