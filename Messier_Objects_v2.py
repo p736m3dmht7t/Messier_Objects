@@ -165,6 +165,12 @@ def format_dec(dec_angle):
     """Formats an Astropy Angle (Dec) to '+DD MM SS' string."""
     return dec_angle.to_string(unit=u.degree, sep=' ', precision=0, pad=True, alwayssign=True)
 
+# --- format_lst ---
+# Formats an Astropy Angle (LST) to 'HH:MM:SS' string with leading zeros.
+def format_lst(lst_angle):
+    """Formats an Astropy Angle (LST) to 'HH:MM:SS' string with leading zeros."""
+    return lst_angle.to_string(unit=u.hourangle, sep=':', precision=0, pad=True)
+
 # --- calculate_horizon_ra ---
 # Calculates the Right Ascension of objects at the altitude limit for specific azimuths
 # Uses the defined altitude_limit (30°) instead of true horizon (0°)
@@ -295,9 +301,9 @@ def main():
         t_sun_antimeridian = Time(t_sun_antimeridian_jd, format='jd', scale='utc', location=observer.location)
         lst_mid = observer.local_sidereal_time(t_sun_antimeridian)
 
-        print(f"Evening Twilight Ends:    {t_evening_astro_twil_end.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_start.to_string(unit=u.hourangle, sep=':', precision=0)})")
-        print(f"Sun Anti-Meridian:        {t_sun_antimeridian.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_mid.to_string(unit=u.hourangle, sep=':', precision=0)})")
-        print(f"Morning Twilight Begins:  {t_morning_astro_twil_start.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_end.to_string(unit=u.hourangle, sep=':', precision=0)})")
+        print(f"Evening Twilight Ends:    {t_evening_astro_twil_end.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {format_lst(lst_start)})")
+        print(f"Sun Anti-Meridian:        {t_sun_antimeridian.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {format_lst(lst_mid)})")
+        print(f"Morning Twilight Begins:  {t_morning_astro_twil_start.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {format_lst(lst_end)})")
 
     except ValueError as e:
         print(f"Error calculating twilight times: {e}")
@@ -486,9 +492,9 @@ def main():
             f.write(f"# Celestial Object Visibility Report\n")
             f.write(f"# Location: Lat={latitude:.4f}, Lon={longitude:.4f}, Alt={altitude:.0f}m\n")
             f.write(f"# Timezone: {observer.timezone.zone}\n")
-            f.write(f"# Evening Twilight Ends:    {t_evening_astro_twil_end.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_start.to_string(unit=u.hourangle, sep=':', precision=0)})  East RA: {format_ra(ra_east_evening)}  West RA: {format_ra(ra_west_evening)}\n")
-            f.write(f"# Sun Anti-Meridian:        {t_sun_antimeridian.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_mid.to_string(unit=u.hourangle, sep=':', precision=0)})  East RA: {format_ra(ra_east_midnight)}  West RA: {format_ra(ra_west_midnight)}\n")
-            f.write(f"# Morning Twilight Begins:  {t_morning_astro_twil_start.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {lst_end.to_string(unit=u.hourangle, sep=':', precision=0)})  East RA: {format_ra(ra_east_morning)}  West RA: {format_ra(ra_west_morning)}\n")
+            f.write(f"# Evening Twilight Ends:    {t_evening_astro_twil_end.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {format_lst(lst_start)})  East RA: {format_ra(ra_east_evening)}  West RA: {format_ra(ra_west_evening)}\n")
+            f.write(f"# Sun Anti-Meridian:        {t_sun_antimeridian.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {format_lst(lst_mid)})  East RA: {format_ra(ra_east_midnight)}  West RA: {format_ra(ra_west_midnight)}\n")
+            f.write(f"# Morning Twilight Begins:  {t_morning_astro_twil_start.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {format_lst(lst_end)})  East RA: {format_ra(ra_east_morning)}  West RA: {format_ra(ra_west_morning)}\n")
             f.write(f"# Total Observable Objects in Report: {len(visible_objects)}\n")
             f.write(f"# Altitude Threshold: > {altitude_limit}\n")
             f.write("# Objects included if: above 30° at evening twilight, OR transit is observable and above 30°, OR above 30° at morning twilight.\n")
