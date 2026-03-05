@@ -486,7 +486,9 @@ def main():
 
     # Write to timestamped file
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_filename = f"Celestial_Objects_Visibility_{timestamp}.txt" # Renamed for generality
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+    output_filename = os.path.join(output_dir, f"Celestial_Objects_Visibility_{timestamp}.txt")
     try:
         with open(output_filename, 'w') as f:
             f.write(f"# Celestial Object Visibility Report\n")
