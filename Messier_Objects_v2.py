@@ -33,7 +33,7 @@ try:
     import numpy as np
     import astropy.units as u
     from astropy.time import Time
-    from astropy.coordinates import EarthLocation, Angle, SkyCoord # Added SkyCoord
+    from astropy.coordinates import EarthLocation, Angle, SkyCoord, get_body, get_sun, GeocentricTrueEcliptic
     from astropy.utils.exceptions import AstropyWarning
     warnings.simplefilter('ignore', category=AstropyWarning)
 except ImportError:
@@ -171,6 +171,34 @@ def format_lst(lst_angle):
     """Formats an Astropy Angle (LST) to 'HH:MM:SS' string with leading zeros."""
     return lst_angle.to_string(unit=u.hourangle, sep=':', precision=0, pad=True)
 
+# --- get_moon_phase ---
+# Calculates the Moon phase name and illuminated percentage for the report header.
+def get_moon_phase(time):
+    """Returns the Moon phase name and illumination percentage at the given time."""
+    sun = get_sun(time).transform_to(GeocentricTrueEcliptic(obstime=time))
+    moon = get_body('moon', time).transform_to(GeocentricTrueEcliptic(obstime=time))
+    phase_angle = (moon.lon - sun.lon).wrap_at(360 * u.deg).to_value(u.deg)
+    illuminated_fraction = (1 - np.cos(np.deg2rad(phase_angle))) / 2
+
+    if phase_angle < 22.5 or phase_angle >= 337.5:
+        phase_name = "New Moon"
+    elif phase_angle < 67.5:
+        phase_name = "Waxing Crescent"
+    elif phase_angle < 112.5:
+        phase_name = "First Quarter"
+    elif phase_angle < 157.5:
+        phase_name = "Waxing Gibbous"
+    elif phase_angle < 202.5:
+        phase_name = "Full Moon"
+    elif phase_angle < 247.5:
+        phase_name = "Waning Gibbous"
+    elif phase_angle < 292.5:
+        phase_name = "Last Quarter"
+    else:
+        phase_name = "Waning Crescent"
+
+    return phase_name, illuminated_fraction * 100
+
 # --- calculate_horizon_ra ---
 # Calculates the Right Ascension of objects at the altitude limit for specific azimuths
 # Uses the defined altitude_limit (30°) instead of true horizon (0°)
@@ -300,6 +328,8 @@ def main():
         t_sun_antimeridian_jd = (t_evening_astro_twil_end.jd + t_morning_astro_twil_start.jd) / 2.0
         t_sun_antimeridian = Time(t_sun_antimeridian_jd, format='jd', scale='utc', location=observer.location)
         lst_mid = observer.local_sidereal_time(t_sun_antimeridian)
+        moon_phase_name, moon_illumination_percent = get_moon_phase(t_sun_antimeridian)
+        moon_at_antimeridian = get_body('moon', t_sun_antimeridian)
 
         print(f"Evening Twilight Ends:    {t_evening_astro_twil_end.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {format_lst(lst_start)})")
         print(f"Sun Anti-Meridian:        {t_sun_antimeridian.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {format_lst(lst_mid)})")
@@ -324,9 +354,9 @@ def main():
     ra_west_morning = calculate_horizon_ra(observer, t_morning_astro_twil_start, 270, altitude_limit)
 
     print(f"Horizon RAs at {altitude_limit} altitude:")
-    print(f"  Evening: East RA {format_ra(ra_east_evening)}, West RA {format_ra(ra_west_evening)}")
+    print(f"  Evening:  East RA {format_ra(ra_east_evening)}, West RA {format_ra(ra_west_evening)}")
     print(f"  Midnight: East RA {format_ra(ra_east_midnight)}, West RA {format_ra(ra_west_midnight)}")
-    print(f"  Morning: East RA {format_ra(ra_east_morning)}, West RA {format_ra(ra_west_morning)}")
+    print(f"  Morning:  East RA {format_ra(ra_east_morning)}, West RA {format_ra(ra_west_morning)}")
 
     # 4. Prepare list of targets (Messier + Custom)
     all_targets_to_process = []
@@ -494,6 +524,8 @@ def main():
             f.write(f"# Celestial Object Visibility Report\n")
             f.write(f"# Location: Lat={latitude:.4f}, Lon={longitude:.4f}, Alt={altitude:.0f}m\n")
             f.write(f"# Timezone: {observer.timezone.zone}\n")
+            f.write(f"# Moon Phase: {moon_phase_name} ({moon_illumination_percent:.1f}% illuminated)\n")
+            f.write(f"# Moon at Sun Anti-Meridian: RA {format_ra(moon_at_antimeridian.ra)}  Dec {format_dec(moon_at_antimeridian.dec)}\n")
             f.write(f"# Evening Twilight Ends:    {t_evening_astro_twil_end.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {format_lst(lst_start)})  East RA: {format_ra(ra_east_evening)}  West RA: {format_ra(ra_west_evening)}\n")
             f.write(f"# Sun Anti-Meridian:        {t_sun_antimeridian.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {format_lst(lst_mid)})  East RA: {format_ra(ra_east_midnight)}  West RA: {format_ra(ra_west_midnight)}\n")
             f.write(f"# Morning Twilight Begins:  {t_morning_astro_twil_start.to_datetime(timezone=observer.timezone).strftime('%Y-%m-%d %H:%M:%S %Z')}  (LST: {format_lst(lst_end)})  East RA: {format_ra(ra_east_morning)}  West RA: {format_ra(ra_west_morning)}\n")
