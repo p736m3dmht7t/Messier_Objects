@@ -297,6 +297,34 @@ def format_time_only(astro_time, observer, is_circumpolar=False, is_outside=Fals
         print(f"Warning: Could not format time {astro_time}: {e}")
         return "N/A"
 
+# --- later_valid_time ---
+# Selects the later valid time, falling back to the available valid time.
+def later_valid_time(first_time, second_time):
+    """Returns the later available Astropy time, or None if both are unavailable."""
+    first_valid = is_valid_time(first_time)
+    second_valid = is_valid_time(second_time)
+    if first_valid and second_valid:
+        return first_time if first_time >= second_time else second_time
+    if first_valid:
+        return first_time
+    if second_valid:
+        return second_time
+    return None
+
+# --- earlier_valid_time ---
+# Selects the earlier valid time, falling back to the available valid time.
+def earlier_valid_time(first_time, second_time):
+    """Returns the earlier available Astropy time, or None if both are unavailable."""
+    first_valid = is_valid_time(first_time)
+    second_valid = is_valid_time(second_time)
+    if first_valid and second_valid:
+        return first_time if first_time <= second_time else second_time
+    if first_valid:
+        return first_time
+    if second_valid:
+        return second_time
+    return None
+
 # --- main ---
 # Main function to calculate Messier and custom object visibility.
 # Handles observer setup, twilight calculation, object processing, and output generation.
@@ -573,57 +601,60 @@ def main():
     variable_objects = [obj for obj in visible_objects if obj.get("variable_info")]
     if variable_objects:
         detail_label_width = col_widths['obj'] + col_widths['ra'] + col_widths['dec'] + 3
-        output_lines.extend(["", "Variable Stars", "=" * len("Variable Stars"), header, separator])
+        variable_header = (
+            f"{'Object':<{col_widths['obj']}} {'RA (J2000)':<{col_widths['ra']}} {'Dec (J2000)':<{col_widths['dec']}} "
+            f"{'First':<{col_widths['rise']}} {'Transit':<{col_widths['transit']}} {'Max Alt':<{col_widths['alt']}} {'Last':<{col_widths['set']}}"
+        )
+        variable_separator = "=" * len(variable_header)
+        output_lines.extend(["", "Variable Stars", "=" * len("Variable Stars"), variable_header, variable_separator])
         for obj in variable_objects:
-            rise_str = format_time_only(
-                obj['rise_time'], observer, obj['is_circumpolar_above_limit'], obj['rise_outside']
-            )
-            set_str = format_time_only(
-                obj['set_time'], observer, obj['is_circumpolar_above_limit'], obj['set_outside']
-            )
+            first_time = later_valid_time(obj['rise_time'], t_evening_astro_twil_end)
+            last_time = earlier_valid_time(obj['set_time'], t_morning_astro_twil_start)
+            first_str = format_time_only(first_time, observer)
+            last_str = format_time_only(last_time, observer)
             transit_str = format_time_only(obj['transit_time'], observer)
             max_alt_str = f"{obj['max_altitude']:.1f}°"
 
             line = (
                 f"{obj['name']:<{col_widths['obj']}} {format_ra(obj['ra']):<{col_widths['ra']}} {format_dec(obj['dec']):<{col_widths['dec']}} "
-                f"{rise_str:<{col_widths['rise']}} {transit_str:<{col_widths['transit']}} {max_alt_str:<{col_widths['alt']}} {set_str:<{col_widths['set']}}"
+                f"{first_str:<{col_widths['rise']}} {transit_str:<{col_widths['transit']}} {max_alt_str:<{col_widths['alt']}} {last_str:<{col_widths['set']}}"
             )
             output_lines.append(line)
 
             t0_hjd_utc = obj["variable_info"]["T0"]
             period_days = obj["variable_info"]["P"]
-            phase_rise = calculate_variable_phase(
-                obj['rise_time'], obj['target_coord'], observer, t0_hjd_utc, period_days
+            phase_first = calculate_variable_phase(
+                first_time, obj['target_coord'], observer, t0_hjd_utc, period_days
             )
             phase_transit = calculate_variable_phase(
                 obj['transit_time'], obj['target_coord'], observer, t0_hjd_utc, period_days
             )
-            phase_set = calculate_variable_phase(
-                obj['set_time'], obj['target_coord'], observer, t0_hjd_utc, period_days
+            phase_last = calculate_variable_phase(
+                last_time, obj['target_coord'], observer, t0_hjd_utc, period_days
             )
-            moon_sep_rise = calculate_moon_separation(obj['rise_time'], obj['target_coord'], observer)
+            moon_sep_first = calculate_moon_separation(first_time, obj['target_coord'], observer)
             moon_sep_transit = calculate_moon_separation(obj['transit_time'], obj['target_coord'], observer)
-            moon_sep_set = calculate_moon_separation(obj['set_time'], obj['target_coord'], observer)
-            phase_rise_str = format_optional_value(phase_rise, 2)
+            moon_sep_last = calculate_moon_separation(last_time, obj['target_coord'], observer)
+            phase_first_str = format_optional_value(phase_first, 2)
             phase_transit_str = format_optional_value(phase_transit, 2)
-            phase_set_str = format_optional_value(phase_set, 2)
-            moon_sep_rise_str = format_optional_value(moon_sep_rise, 0, ' deg')
+            phase_last_str = format_optional_value(phase_last, 2)
+            moon_sep_first_str = format_optional_value(moon_sep_first, 0, ' deg')
             moon_sep_transit_str = format_optional_value(moon_sep_transit, 0, ' deg')
-            moon_sep_set_str = format_optional_value(moon_sep_set, 0, ' deg')
+            moon_sep_last_str = format_optional_value(moon_sep_last, 0, ' deg')
 
             output_lines.append(
                 f"{'  Phase':<{detail_label_width}}"
-                f"{phase_rise_str:<{col_widths['rise']}} "
+                f"{phase_first_str:<{col_widths['rise']}} "
                 f"{phase_transit_str:<{col_widths['transit']}} "
                 f"{'':<{col_widths['alt']}} "
-                f"{phase_set_str:<{col_widths['set']}}"
+                f"{phase_last_str:<{col_widths['set']}}"
             )
             output_lines.append(
                 f"{'  Moon Sep':<{detail_label_width}}"
-                f"{moon_sep_rise_str:<{col_widths['rise']}} "
+                f"{moon_sep_first_str:<{col_widths['rise']}} "
                 f"{moon_sep_transit_str:<{col_widths['transit']}} "
                 f"{'':<{col_widths['alt']}} "
-                f"{moon_sep_set_str:<{col_widths['set']}}"
+                f"{moon_sep_last_str:<{col_widths['set']}}"
             )
 
     print("\n" + "\n".join(output_lines))
