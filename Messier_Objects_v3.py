@@ -227,8 +227,13 @@ def calculate_moon_separation(astro_time, coord, observer):
     if not is_valid_time(astro_time):
         return None
 
+    from astropy.coordinates import AltAz
+
+    altaz_frame = AltAz(obstime=astro_time, location=observer.location)
+    target_altaz = coord.transform_to(altaz_frame)
     moon_coord = get_body('moon', astro_time, observer.location)
-    return coord.separation(moon_coord).to_value(u.deg)
+    moon_altaz = moon_coord.transform_to(altaz_frame)
+    return target_altaz.separation(moon_altaz).to_value(u.deg)
 
 # --- format_optional_value ---
 # Formats optional phase and Moon separation values for variable-star rows.
