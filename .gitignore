@@ -1,6 +1,9 @@
 # Claude Code
 .claude/
 
+# Codex task notes
+tasks/
+
 # Secrets
 .env
 
