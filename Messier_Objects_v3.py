@@ -491,6 +491,17 @@ def main():
             transit_time = observer.target_meridian_transit_time(
                 t_sun_antimeridian, target, which="nearest", n_grid_points=360
             )
+            if not is_valid_time(transit_time) or not (
+                t_evening_astro_twil_end <= transit_time <= t_morning_astro_twil_start
+            ):
+                next_transit_time = observer.target_meridian_transit_time(
+                    t_evening_astro_twil_end, target, which="next", n_grid_points=360
+                )
+                if (
+                    is_valid_time(next_transit_time)
+                    and next_transit_time <= t_morning_astro_twil_start
+                ):
+                    transit_time = next_transit_time
             rise_time = observer.target_rise_time(
                 transit_time, target, which="previous", horizon=altitude_limit, n_grid_points=360
             )
