@@ -206,7 +206,7 @@ def main() -> None:
     print(name)
     print(f"RA   {ra_deg} deg    {ra_hms}")
     print(f"Dec  {dec_deg} deg   {dec_dms}")
-    print(f"T0={args.t0:.6f} {time_sys_label(args.time_sys)}   P={args.p:.8f} d")
+    print(f"T0={args.t0:.6f} {time_sys_label(args.time_sys)}   P={args.p:.6f} d")
     print(
         f"Site lat={args.lat:.5f}  lon={args.lon:.5f}  elev={args.elev:.0f} m"
         f"   {args.start} → {args.end}"
@@ -234,7 +234,7 @@ def main() -> None:
 
     keep = (star_alt >= args.min_alt) & (sun_alt <= args.sun_alt)
 
-    hdr = f"{'Q':<4} {'UTC':<19} {'Elev':>6} {'Moon%':>6} {'MoonSep':>8}"
+    hdr = f"{'Q':<4} {'UTC':^22} {'JD':^14} {'Elev':>6} {'Moon%':>6} {'MoonSep':>8}"
     print(hdr)
     print("-" * len(hdr))
 
@@ -243,8 +243,9 @@ def main() -> None:
         if not ok:
             continue
         n_keep += 1
-        utc = t.strftime("%Y-%m-%d %H:%M")
-        print(f"{lab:<4} {utc:<19} {alt:6.1f} {100.0 * frac:6.0f} {sep:8.1f}")
+        utc = t.strftime("%Y-%m-%d %H:%M:%S")
+        print(f"{lab:<4} {utc:<22} {t.utc.jd:14.6f} {alt:6.1f} {100.0 * frac:6.0f} {sep:8.1f}")
+
 
     print()
     print(
