@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import numpy as np
 from astropy import units as u
@@ -44,6 +45,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lat", type=float, required=True, help="Observatory latitude (deg, +N)")
     p.add_argument("--lon", type=float, required=True, help="Observatory longitude (deg, +E)")
     p.add_argument("--elev", type=float, default=0.0, help="Observatory elevation (m)")
+    p.add_argument(
+        "--tz",
+        default="",
+        help="IANA timezone (e.g. America/Phoenix). Default: from lat/lon",
+    )
     p.add_argument("--ra", required=True, help="Star RA (e.g. 12:34:56.7 or 188.736 deg)")
     p.add_argument("--dec", required=True, help="Star Dec (e.g. +12:34:56 or 12.582 deg)")
     p.add_argument("--t0", type=float, required=True, help="Epoch of primary minimum")
@@ -186,10 +192,46 @@ def time_sys_label(time_sys: str) -> str:
     return {"bjd_tdb": "BJD_TDB", "hjd": "HJD_UTC", "jd_utc": "JD_UTC"}[time_sys]
 
 
+def resolve_timezone(lat: float, lon: float, tz_name: str = "") -> ZoneInfo:
+    """Civil timezone including DST rules. --tz overrides coordinate lookup.
+
+    On Windows, the IANA database is not bundled with Python. Install it with:
+        pip install tzdata
+    """
+    try:
+        import tzdata  # noqa: F401  — provides zoneinfo data on Windows
+    except ImportError:
+        pass
+
+    name = (tz_name or "").strip()
+    if not name:
+        try:
+            from timezonefinder import TimezoneFinder
+
+            name = TimezoneFinder().timezone_at(lng=lon, lat=lat) or ""
+        except Exception:
+            name = ""
+    if not name:
+        hours = int(round(lon / 15.0))
+        name = f"Etc/GMT{-hours:+d}" if hours != 0 else "Etc/UTC"
+    try:
+        return ZoneInfo(name)
+    except Exception as exc:
+        raise SystemExit(
+            f"Cannot load timezone '{name}'. On Windows install the IANA database:\n"
+            f"    pip install tzdata\n"
+            f"Also recommended:  pip install timezonefinder\n"
+            f"Or pass an explicit zone with --tz America/Phoenix\n"
+            f"({exc})"
+        ) from exc
+
+
+
 def main() -> None:
     args = parse_args()
     location = EarthLocation(lat=args.lat * u.deg, lon=args.lon * u.deg, height=args.elev * u.m)
     star = parse_coord(args.ra, args.dec, args.ra_unit)
+    tz = resolve_timezone(args.lat, args.lon, args.tz)
 
     t_start = local_noon_utc(args.start, args.lon)
     t_end = local_noon_utc(args.end, args.lon) + 1.0 * u.day
@@ -209,7 +251,7 @@ def main() -> None:
     print(f"T0={args.t0:.6f} {time_sys_label(args.time_sys)}   P={args.p:.6f} d")
     print(
         f"Site lat={args.lat:.5f}  lon={args.lon:.5f}  elev={args.elev:.0f} m"
-        f"   {args.start} → {args.end}"
+        f"   tz={tz.key}   {args.start} → {args.end}"
     )
     print()
 
@@ -234,7 +276,10 @@ def main() -> None:
 
     keep = (star_alt >= args.min_alt) & (sun_alt <= args.sun_alt)
 
-    hdr = f"{'Q':<4} {'UTC':^22} {'JD':^14} {'Elev':>6} {'Moon%':>6} {'MoonSep':>8}"
+    hdr = (
+        f"{'Q':<4} {'UTC':^22} {'Local':^22} {'JD':^14} "
+        f"{'Elev':>6} {'Moon%':>6} {'MoonSep':>8}"
+    )
     print(hdr)
     print("-" * len(hdr))
 
@@ -244,7 +289,16 @@ def main() -> None:
             continue
         n_keep += 1
         utc = t.strftime("%Y-%m-%d %H:%M:%S")
-        print(f"{lab:<4} {utc:<22} {t.utc.jd:14.6f} {alt:6.1f} {100.0 * frac:6.0f} {sep:8.1f}")
+        local = (
+            t.utc.to_datetime(timezone=timezone.utc)
+            .astimezone(tz)
+            .strftime("%Y-%m-%d %H:%M:%S")
+        )
+        print(
+            f"{lab:<4} {utc:<22} {local:<22} {t.utc.jd:14.6f} "
+            f"{alt:6.1f} {100.0 * frac:6.0f} {sep:8.1f}"
+        )
+
 
 
     print()
