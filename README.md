@@ -1,5 +1,65 @@
 # Messier Objects Visibility Script Documentation
 
+## Single-object seasonal visibility
+
+Run the interactive single-object application with the project's virtual environment:
+
+```powershell
+.\.venv\Scripts\python.exe .\Single_Object_Visibility_v1.py
+```
+
+Choose an object from `custom_objects.json`, resolve a catalog name such as `M31`
+(requires internet access), or supply a name and RA/Dec manually. The script reads
+location, timezone, and `ALTITUDE_LIMIT` from the `.env` beside the script, just as
+the catalog application does. Custom-object variable-star fields are ignored.
+Set the optional `SITE_NAME` in `.env` to name the observatory; otherwise the site
+is labeled `Unnamed site`. The console site line includes its name, coordinates,
+elevation in meters, and timezone, followed by a separate visibility-criteria line.
+
+Enter a local evening date as `YYYY-MM-DD`, or press Enter to start now. The default
+includes the remainder of an ongoing night; an explicitly entered date includes
+that date's entire observing night. There is no end-date prompt: the search follows
+the next run of visible nights through its last qualifying night.
+
+Results contain exactly three rows: **first visibility**, **maximum visibility**,
+and **last visibility**. Each shows the local evening date, first and last available
+timestamps with timezone, and total visible hours to two decimal places. Columns
+are aligned with space reserved for an asterisk. A `*` on the first row means the
+run was already underway at the start. The same three rows are saved under
+`output/Single_Object_Visibility_<object>_<timestamp>.txt`.
+
+An object qualifies using v3's altitude checks at evening astronomical twilight,
+nighttime transit, or morning astronomical twilight. Total hours are the sum of
+all intervals at or above the altitude limit during astronomical darkness; a gap
+between first and last timestamps is not counted. Even a qualifying instant counts
+as a visible night, with `0.00 h (instant)` shown explicitly. Durations are rounded
+only for display; a positive duration that rounds to `0.00 h` still qualifies.
+No minimum duration,
+Moon constraints, or variable-star phase constraints are applied.
+
+Only the next run is reported. For an ongoing run, the maximum is selected from
+the requested start onward, using full nightly durations. The first row's windows
+are clipped to now when using the default start; the maximum retains the complete
+night's duration. Exactly tied maxima select the date closest to the middle of
+the tied dates, choosing the earlier date if two are equally central.
+
+The search checks up to 400 nights to find visibility and up to 400 qualifying
+run nights to find its end. If no visibility or no seasonal disappearance is found,
+the three rows say so explicitly. A maximum without a found endpoint applies only
+to the checked nights, rather than claiming an unlimited maximum. Sites/dates
+without ordinary evening and morning astronomical twilight produce an explicit
+error. Timestamps are displayed to seconds, but twilight and transit calculations
+use v3's 360-point Astroplan grids and do not guarantee second-level accuracy.
+Astropy can update its Earth-rotation data when online. The application also allows
+approximate planning with older available predictions; Astropy reports warnings
+when those data do not cover the requested dates.
+
+Run the focused checks with:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
 ## Overview
 
 The `Messier_Objects.py` script is a Python tool designed to identify Messier objects visible during a specific night from a user-defined location. It calculates the observation window between the end of evening astronomical twilight and the start of morning astronomical twilight, determining which Messier objects are above a 30-degree altitude threshold at key times during this period. The script outputs a detailed report to both the console and a timestamped text file, providing astronomers with a clear list of observable objects for planning observing sessions.
